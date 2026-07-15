@@ -1,3 +1,47 @@
 project:
   type: website
   output-dir: docs
+
+website: 
+  page-navigation: true
+  navbar: 
+    background: "#0077b6"
+    search: true
+    left: 
+      - text: anV
+        href: https://anv.life/
+    right: 
+      - text: Classifiers
+        menu: 
+          - text: Silva 138
+            href: https://anw-sh.github.io/silva-138_classifiers/
+          - text: Silva 138.2
+            href: https://anw-sh.github.io/silva138.2_classifier/
+          - text: NCBI
+            href: https://anw-sh.github.io/ncbi_classifier/
+    tools:
+      - icon: github
+        href: https://github.com/anw-sh/pacbio_16s
+  page-footer: 
+    background: light
+    border: true
+    left: 
+      - text: anV
+        href: https://anv.life/
+    right:
+      - icon: youtube
+        href: "https://www.youtube.com/@analysisVenue"
+    center: "Anwesh Maile"
+  comments: 
+    giscus: 
+      repo: anw-sh/pacbio_16s
+      repo-id: R_kgDOTZBDFg
+      category: Announcements
+      category-id: DIC_kwDOTZBDFs4DBPoR
+      mapping: pathname
+      input-position: bottom
+      reactions-enabled: true
+      loading: lazy
+      theme: 
+        light: catppuccin_latte
+        dark: catppuccin_frappe

@@ -1,5 +1,5 @@
 ---
-title: "PacBio 16S rRNA reads"
+title: "PacBio 16S rRNA amplicon Analysis"
 author: "Anwesh, DBT-CMI"
 date: last-modified
 format:
@@ -11,6 +11,7 @@ format:
         lightbox: true
         df-print: paged
         code-line-numbers: true
+        link-external-icon: true
 toc: true
 ---
 
@@ -30,7 +31,7 @@ Working directory: `test_pacbio`
 :::
 
 ## Get data
-Download SraRunTable. Make a list of SRR IDs
+Download [SraRunTable](https://www.ncbi.nlm.nih.gov/Traces/study/?acc=PRJNA930143&o=acc_s%3Aa). Make a list of SRR IDs
 ```bash
 $ cut -f 1 -d "," SraRunTable.csv | grep 'Run' -v > samples_list.txt
 ```
@@ -538,6 +539,8 @@ pb_plot
 
 > The HiFi workflow is better over QIIME2 based outputs, with the provided parameters. QIIME2 workflow may need tweaking for a better output.
 
-:::{.alert .alert-success .text-center .small .pb-0}
+<!-- :::{.alert .alert-success .text-center .small .pb-0}
 --- END ---
-:::
+::: -->
+
+***
