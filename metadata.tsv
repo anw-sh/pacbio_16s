@@ -1,0 +1,7 @@
+SampleID	BioProject	BioSample	env_broad_scale	env_local_scale	env_medium	geo_loc_name	SampleName	Organism
+SRR23329747	PRJNA930143	SAMN33051429	Shrimp culture farm	Pond 5	culture pond	India: Andhra Pradesh	WFS_C	Penaeus vannamei
+SRR23329748	PRJNA930143	SAMN33051429	Shrimp culture farm	Pond 5	culture pond	India: Andhra Pradesh	WFS_B	Penaeus vannamei
+SRR23329749	PRJNA930143	SAMN33051429	Shrimp culture farm	Pond 5	culture pond	India: Andhra Pradesh	WFS_A	Penaeus vannamei
+SRR23295634	PRJNA930143	SAMN32984423	Shrimp culture Farm	Pond 1	Healthy Shrimp gut	India: Andhra pradesh	C1_C	Penaeus vannamei
+SRR23295635	PRJNA930143	SAMN32984423	Shrimp culture Farm	Pond 1	Healthy Shrimp gut	India: Andhra pradesh	C1_B	Penaeus vannamei
+SRR23295636	PRJNA930143	SAMN32984423	Shrimp culture Farm	Pond 1	Healthy Shrimp gut	India: Andhra pradesh	C1_A	Penaeus vannamei

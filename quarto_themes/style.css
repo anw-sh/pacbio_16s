@@ -1,0 +1,55 @@
+@font-face {
+    font-family: "Fira Sans";
+    src: url("./fonts/Fira_Sans/FiraSans-Regular.ttf");
+}
+
+@font-face {
+    font-family: "Fira Code";
+    src: url("./fonts/Fira_Code/FiraCode-VariableFont_wght.ttf");
+}
+
+@font-face {
+    font-family: "Inter";
+    src: url("./fonts/Inter/Inter-VariableFont_opsz_wght.ttf");
+}
+
+body {
+    font-family: "Inter", sans-serif;
+    font-size: 0.9em !important;
+    font-weight: 400;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: "Fira Sans", sans-serif;
+    font-weight: 400;
+    color: var(--bs-primary);
+}
+
+h2 {
+    color: #219ebc;
+}
+
+h3 {
+    color: #e36414;
+}
+
+h4 {
+    color: #008000;
+}
+
+h5 {
+    color: #bc4749;
+}
+
+h6 {
+    color: #6a4c93;
+}
+
+
+code, pre {
+    font-family: "Fira Code", monospace;
+}
+
+strong {
+    font-weight: 600;
+}

@@ -1,0 +1,25 @@
+java -ea -Xmx9476m -Xms9476m -cp /home/anwesh/.local/share/mamba/envs/qc/opt/bbmap-39.25-0/current/ jgi.BBDuk in=/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/raw_reads/SRR23295634.fastq.gz out=/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/bb_out/SRR23295634.fq.gz ref=~/pacbio_primers.fa copyundefined k=17 mink=7 ktrim=rl hdist=1 hdist2=0 threads=10
+Executing jgi.BBDuk [in=/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/raw_reads/SRR23295634.fastq.gz, out=/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/bb_out/SRR23295634.fq.gz, ref=/home/anwesh/pacbio_primers.fa, copyundefined, k=17, mink=7, ktrim=rl, hdist=1, hdist2=0, threads=10]
+Version 39.25
+
+Set threads to 10
+maskMiddle was disabled because useShortKmers=true
+Allocating kmer table: 	0.029 seconds.
+Initial:
+Memory: max=9940m, total=9940m, free=9904m, used=36m
+
+Added 3070 kmers; time: 	0.022 seconds.
+Memory: max=9940m, total=9940m, free=9872m, used=68m
+
+Input is being processed as unpaired
+Started output streams:	0.026 seconds.
+Processing time:   		1.022 seconds.
+
+Input:                  	47872 reads 		71752513 bases.
+KTrimmed:               	47862 reads (99.98%) 	1923803 bases (2.68%)
+Total Removed:          	0 reads (0.00%) 	1923803 bases (2.68%)
+Result:                 	47872 reads (100.00%) 	69828710 bases (97.32%)
+
+Time:                         	1.073 seconds.
+Reads Processed:       47872 	44.63k reads/sec
+Bases Processed:      71752k 	66.89m bases/sec

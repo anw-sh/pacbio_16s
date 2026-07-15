@@ -1,0 +1,6 @@
+/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/bb_out/SRR23295634.log:Result:                 	47872 reads (100.00%) 	69828710 bases (97.32%)
+/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/bb_out/SRR23295635.log:Result:                 	35263 reads (100.00%) 	51095510 bases (97.28%)
+/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/bb_out/SRR23295636.log:Result:                 	65015 reads (100.00%) 	95632320 bases (97.39%)
+/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/bb_out/SRR23329747.log:Result:                 	78834 reads (100.00%) 	116073262 bases (97.45%)
+/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/bb_out/SRR23329748.log:Result:                 	20586 reads (100.00%) 	29720209 bases (97.31%)
+/run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/bb_out/SRR23329749.log:Result:                 	52602 reads (100.00%) 	78001004 bases (97.49%)

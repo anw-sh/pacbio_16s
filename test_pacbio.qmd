@@ -1,0 +1,543 @@
+---
+title: "PacBio 16S rRNA reads"
+author: "Anwesh, DBT-CMI"
+date: last-modified
+format:
+    html:
+        theme: journal
+        css: "quarto_themes/style.css"
+        embed-resources: true
+        smooth-scroll: true
+        lightbox: true
+        df-print: paged
+        code-line-numbers: true
+toc: true
+---
+
+Started on **24-06-26**
+
+Testing the anlysis of 16S rRNA reads derived from PacBio instruments
+
+- Study: [PRJNA930143](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA930143)
+- Sample size: 6
+- Environment: Shrimp cultivation farm
+- Sample: Shrimp microbiome
+- Sample types: Cultured pond water and Shrimp gut
+- Instrument: PacBio Sequel II
+
+:::{.small}
+Working directory: `test_pacbio`
+:::
+
+## Get data
+Download SraRunTable. Make a list of SRR IDs
+```bash
+$ cut -f 1 -d "," SraRunTable.csv | grep 'Run' -v > samples_list.txt
+```
+
+
+Select required columns from the RunTable and save as `metadata.tsv` (@tbl-metadata)
+
+```{r}
+#| echo: false
+#| label: tbl-metadata
+#| tbl-cap: Metadata
+metadata_file <- read.csv("./metadata.tsv", sep = "\t")
+knitr::kable(metadata_file, "html")
+```
+
+
+Download SRA files and extract
+```bash
+$ mkdir sra_files
+(sra)$ prefetch -p -O sra_files --option-file samples_list.txt
+$ mkdir raw_reads
+(sra)$ fasterq-dump sra_files/* -O raw_reads/ -p
+# Alternatively, use fasterq-dump on the samples_list.txt, directly
+```
+:::{.callout-tip icon='false' title="`--split-3`"}
+No need to use `-3` when extracting PacBio reads
+:::
+
+## Read and Primer counts
+Counting the total number of reads and primers in each sample (@tbl-read_primer_counts)
+```bash
+$ echo -e "Sample\tTotal_Reads\tF_count\tR_count" > read_primer_counts.tsv
+$ for sample in $(cat samples_list.txt); do echo -e "$sample\t"$(grep '^@' raw_reads/$sample.fastq -c)"\t"$(grep 'AG[GA]GTT[TC]GAT[TC][AC]TGGCTCAG' raw_reads/$sample.fastq -c)"\t"$(grep 'AAGTCGTAACAAGGTA[GA]C[TC]' raw_reads/$sample.fastq -c); done >> read_primer_counts.tsv
+```
+
+```{r}
+#| echo: false
+#| label: tbl-read_primer_counts
+#| tbl-cap: Read and primer counts (Raw)
+raw_primer_counts <- read.csv("./read_primer_counts.tsv", sep = "\t")
+knitr::kable(raw_primer_counts, "html")
+```
+
+
+Compress raw reads (optional)
+```bash
+$ pigz -v raw_reads/*
+```
+
+
+## QIIME2
+Only a few reads do not have primer sequences.  
+Trying two different methods:
+
+- run `denoise-ccs` to perform all primer removal and dada2 steps
+- remove primers and run `denoise-ccs` to perform just the dada2 steps
+
+QIIME2 version: **2026.1**
+
+[Installation](https://library.qiime2.org/quickstart/qiime2)
+
+:::{.callout-note}
+- Tried QIIME 2026.4, but it uses `scikit-learn v1.7.1` which is incompatible with existing classifiers.  
+- A classifier was built with the new version, but the evaluators are not available in QIIME 2026.4, as on 3^rd^ Jul 2026 - check `ncbi_classifier.qmd` (note to self).  
+- So using the latest version of QIIME2 with scikit-learn v1.4.2, i.e. 2026.1
+:::
+
+```bash
+$ conda env create --name q2_261 --file https://raw.githubusercontent.com/qiime2/distributions/refs/heads/dev/2026.1/amplicon/released/qiime2-amplicon-ubuntu-latest-conda.yml
+```
+
+Make a manifest file (@tbl-manifest_raw)
+```bash
+$ echo -e "sample-id\tabsolute-filepath" > manifest_raw.tsv
+$ awk '{ print $1"\t$PWD/raw_reads/"$1".fastq.gz" }' samples_list.txt >> manifest_raw.tsv
+```
+
+```{r}
+#| echo: false
+#| label: tbl-manifest_raw
+#| tbl-cap: Manifest (Raw reads)
+manifest_raw <- read.csv("./manifest_raw.tsv", sep = '\t')
+knitr::kable(manifest_raw, 'html')
+```
+
+
+Import data into q2 pipeline
+```bash
+$ mkdir q2_raw
+(q2_261)$ qiime tools import --type 'SampleData[SequencesWithQuality]' --input-path manifest_raw.tsv --output-path q2_raw/1_import.qza --input-format SingleEndFastqManifestPhred33V2
+$ cd q2_raw
+(q2_261)$ qiime demux summarize --i-data 1_import.qza --o-visualization 1_import.qzv
+```
+
+### Denoise directly
+
+Run DADA2
+```bash
+(q2_261)$ qiime dada2 denoise-ccs --i-demultiplexed-seqs 1_import.qza --p-front AGRGTTYGATYMTGGCTCAG --p-adapter AAGTCGTAACAAGGTARCY --p-min-len 1000 --p-max-len 1600 --p-n-threads 10 --o-table 2_table.qza --o-representative-sequences 2_repseqs.qza --o-denoising-stats 2_stats.qza --o-base-transition-stats 2_bt_stats.qza
+# Generate visualization for stats
+(q2_261)$ qiime metadata tabulate --m-input-file 2_stats.qza --o-visualization 2_stats.qzv
+```
+
+:::{.callout-caution icon="false" title="Very few reads"}
+Only a few reads were retained ranging from 1-74 per sample.  
+Trying the reverse complement "RGYTACCTTGTTACGACTT" as an argument for `--p-adapter`. Mentioned [here](https://forum.qiime2.org/t/dada2-denoise-ccs-most-reads-were-filtered-out/32702) and [here](https://www.pacb.com/wp-content/uploads/Procedure-checklist-Amplification-of-bacterial-full-length-16S-rRNA-gene-with-barcoded-primers.pdf)
+:::
+
+Upon searching for the above sequence, it was found a few bp before the 3' region and in very less numbers.
+```bash
+$ grep '[GA]G[TC]TACCTTGTTACGACTT' raw_reads/SRR23295634.fastq
+# 64 occurrences
+```
+Anyways, trying the modification
+```bash
+(q2_261)$ qiime dada2 denoise-ccs --i-demultiplexed-seqs 1_import.qza --p-front AGRGTTYGATYMTGGCTCAG --p-adapter RGYTACCTTGTTACGACTT --p-min-len 1000 --p-max-len 1600 --p-n-threads 10 --o-table 2_table2.qza --o-representative-sequences 2_repseqs2.qza --o-denoising-stats 2_stats2.qza --o-base-transition-stats 2_bt_stats2.qza
+# Approximately 3 hrs 40 mins
+(q2_261)$ qiime metadata tabulate --m-input-file 2_stats2.qza --o-visualization 2_stats2.qzv
+(q2_261)$ qiime feature-table summarize --i-table 2_table2.qza --o-feature-frequencies 2_feature_freqs2.qza --o-sample-frequencies 2_sample_freqs2.qza  --o-summary 2_table2.qzv --m-metadata-file ../metadata.tsv
+(q2_261)$ qiime feature-table tabulate-seqs --i-data 2_repseqs2.qza --o-visualization 2_repseqs2.qzv
+```
+Approximately 78-88% reads survived primer removal step and by the end 32-67% survived the DADA2 process (@tbl-stats_raw2)
+
+```{r}
+#| echo: false
+#| label: tbl-stats_raw2
+#| tbl-cap: Denoising stats (raw2)
+stats_raw2 <- read.csv("./q2_raw/2_stats2.tsv", sep = '\t')
+knitr::kable(stats_raw2, "html")
+```
+
+Trying without the `--p-adapter`
+```bash
+(q2_261)$ qiime dada2 denoise-ccs --i-demultiplexed-seqs 1_import.qza --p-front AGRGTTYGATYMTGGCTCAG --p-min-len 1000 --p-max-len 1600 --p-n-threads 10 --o-table 2_table3.qza --o-representative-sequences 2_repseqs3.qza --o-denoising-stats 2_stats3.qza --o-base-transition-stats 2_bt_stats3.qza
+# Approximately 3 hrs 40 mins
+(q2_261)$ qiime metadata tabulate --m-input-file 2_stats3.qza --o-visualization 2_stats3.qzv
+(q2_261)$ qiime feature-table summarize --i-table 2_table3.qza --o-feature-frequencies 2_feature_freqs3.qza --o-sample-frequencies 2_sample_freqs3.qza  --o-summary 2_table3.qzv --m-metadata-file ../metadata.tsv
+(q2_261)$ qiime feature-table tabulate-seqs --i-data 2_repseqs3.qza --o-visualization 2_repseqs3.qzv
+```
+The output is almost same as above (@tbl-stats_raw3)
+
+```{r}
+#| echo: false
+#| label: tbl-stats_raw3
+#| tbl-cap: Denoising stats (raw3)
+stats_raw3 <- read.csv("./q2_raw/2_stats3.tsv", sep = "\t")
+knitr::kable(stats_raw3, "html")
+```
+
+
+### Remove primers and denoise 
+
+:::{.callout-caution icon="false" title="Not useful" collapse="true"}
+Trying BBDuk, instead of the default `adapters.fa` file, a new file, `pacbio_primers.fa`, with required primer sequences was used
+
+```{ojs}
+//| echo: false
+primers_file = FileAttachment("./primers.fa").text()
+html`<pre>${primers_file}</pre>`
+```
+
+
+BBDuk
+```bash
+(qc)$ bbduk.sh in=raw_reads/SRR23295634.fastq.gz out=bb_out/SRR23295634.fq.gz ref=~/pacbio_primers.fa copyundefined k=17 mink=7 hdist=1 hdist2=0 ktrim=rl
+```
+
+The same was run as script on all samples - `run_bbduk_PacBio.py` (not provided here)  
+`utility_paths.csv` was modified to look for `pacbio_primers.fa` (irrelevant; self note)  
+After processing with `bbduk.sh` no primer sequences were found (@tbl-read_primer_counts_f)
+```bash
+$ echo -e "Sample\tTotal_reads\tF_count\tR_count" > read_primer_counts_postFilt.tsv
+$ for sample in $(cat samples_list.txt); do echo -e "$sample\t"$(zcat bb_out/$sample.fq.gz | grep '^@' -c)"\t"$(zcat bb_out/$sample.fq.gz | grep 'AG[GA]GTT[TC]GAT[TC][AC]TGGCTCAG' -c)"\t"$(zcat bb_out/$sample.fq.gz | grep 'AAGTCGTAACAAGGTA[GA]C[TC]' -c); done >> read_primer_counts_postFilt.tsv
+```
+```{r}
+#| echo: false
+#| label: tbl-read_primer_counts_f
+#| tbl-cap: Read and primer counts (Filtered)
+bbout_primer_counts <- read.csv("./read_primer_counts_postFilt.tsv", sep = "\t")
+knitr::kable(bbout_primer_counts, "html")
+```
+
+
+> There is a change in the quality score, maximum was set to 50 (probably because BBduk was made for short reads!).
+
+Generate manifest file (@tbl-manifest_filt)
+```bash
+$ echo -e "sample-id\tabsolute-filepath" > manifest_filt.tsv
+$ awk '{ print $1"\t$PWD/bb_out/"$1".fq.gz" }' samples_list.txt >> manifest_filt.tsv 
+```
+
+```{r}
+#| echo: false
+#| label: tbl-manifest_filt
+#| tbl-cap: Manifest (Filtered reads)
+filt_manifest_file <- read.csv("./manifest_filt.tsv", sep = "\t")
+knitr::kable(filt_manifest_file, "html")
+```
+
+Import
+```bash
+$ mkdir q2_filt
+(q2_261)$ qiime tools import --type 'SampleData[SequencesWithQuality]' --input-path manifest_filt.tsv --output-path q2_filt/1_import.qza --input-format SingleEndFastqManifestPhred33V2
+$ cd q2_filt
+(q2_261)$ qiime demux summarize --i-data 1_import.qza --o-visualization 1_import.qzv
+```
+
+Since the primers were removed, `denoise-ccs` should discard all reads if primer sequence was provided
+```bash
+(q2_261)$ qiime dada2 denoise-ccs --i-demultiplexed-seqs 1_import.qza --p-front AGRGTTYGATYMTGGCTCAG --p-min-len 1000 --p-max-len 1600 --p-n-threads 10 --o-table 2_table.qza --o-representative-sequences 2_repseqs.qza --o-denoising-stats 2_stats.qza --o-base-transition-stats 2_bt_stats.qza
+(q2_261)$ qiime metadata tabulate --m-input-file 2_stats.qza --o-visualization 2_stats.qzv
+```
+Yes, nearly no output
+
+Howerver, since `--p-front` is a required parameter, excluding it or providing empty string throws error
+```bash
+# Throws error
+(q2_261)$ qiime dada2 denoise-ccs --i-demultiplexed-seqs 1_import.qza --p-front "" --p-min-len 1000 --p-max-len 1600 --p-n-threads 10 --o-table 2_table.qza --o-representative-sequences 2_repseqs2.qza --o-denoising-stats 2_stats2.qza --o-base-transition-stats 2_bt_stats2.qza
+```
+
+Instead of empty string providing `N` as an argument for `--p-front` should run and include all sequences, as it will expect any base at the beginning
+```bash
+(q2_261)$ qiime dada2 denoise-ccs --i-demultiplexed-seqs 1_import.qza --p-front N --p-min-len 1000 --p-max-len 1600 --p-n-threads 10 --o-table 2_table2.qza --o-representative-sequences 2_repseqs2.qza --o-denoising-stats 2_stats2.qza --o-base-transition-stats 2_bt_stats2.qza
+# Approximately 3 hrs 40 mins
+(q2_261)$ qiime metadata tabulate --m-input-file 2_stats2.qza --o-visualization 2_stats2.qzv
+(q2_261)$ qiime feature-table summarize --i-table 2_table2.qza --o-feature-frequencies 2_feature_freqs2.qza --o-sample-frequencies 2_sample_freqs2.qza  --o-summary 2_table2.qzv --m-metadata-file ../metadata.tsv
+(q2_261)$ qiime feature-table tabulate-seqs --i-data 2_repseqs2.qza --o-visualization 2_repseqs2.qzv
+```
+There is a slight improvement over the previous method (@tbl-stats_filt2) 
+
+```{r}
+#| echo: false
+#| label: tbl-stats_filt2
+#| tbl-cap: Denoising stats (filt2)
+stats_filt2 <- read.csv("./q2_filt/2_stats2.tsv", sep = "\t")
+knitr::kable(stats_filt2, 'html')
+```
+
+:::
+
+***
+
+What about the **sequence lengths**?
+
+```{r}
+#| echo: false
+#| label: tbl-raw2_seq
+#| tbl-cap: raw2
+#| tbl-subcap:
+#|  - "Descriptive Stats"
+#|  - "Percentiles"
+#| layout-ncol: 2
+
+library(knitr)
+seq_lengths_raw2 <- read.csv("./q2_raw/2_descriptive_stats2.tsv", sep = "\t")
+seq_pctile_raw2 <- read.csv("./q2_raw/2_seven_number_summary2.tsv", sep = "\t")
+
+kable(seq_lengths_raw2, digits = 2)
+kable(seq_pctile_raw2)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-raw3_seq
+#| tbl-cap: raw3
+#| tbl-subcap:
+#|  - "Descriptive Stats"
+#|  - "Percentiles"
+#| layout-ncol: 2
+
+library(knitr)
+seq_lengths_raw3 <- read.csv("./q2_raw/2_descriptive_stats3.tsv", sep = "\t")
+seq_pctile_raw3 <- read.csv("./q2_raw/2_seven_number_summary3.tsv", sep = "\t")
+
+kable(seq_lengths_raw3, digits = 2)
+kable(seq_pctile_raw3)
+```
+
+:::{.callout-caution icon="false" title="filt2 (Ignore)" collapse="true"}
+
+```{r}
+#| echo: false
+#| label: tbl-filt2_seq
+#| tbl-cap: filt2
+#| tbl-subcap:
+#|  - "Descriptive Stats"
+#|  - "Percentiles"
+#| layout-ncol: 2
+
+library(knitr)
+seq_lengths_filt2 <- read.csv("./q2_filt/2_descriptive_stats2.tsv", sep = "\t")
+seq_pctile_filt2 <- read.csv("./q2_filt/2_seven_number_summary2.tsv", sep = "\t")
+
+kable(seq_lengths_filt2, digits = 2)
+kable(seq_pctile_filt2)
+```
+
+:::
+
+Using `raw3` and `filt2` for downstream analysis
+
+### Classification
+Silva classifier may not give species level resolution. Since we have full length 16S rRNA reads, other classifiers like GreenGenes, GTDB, or NCBI may be useful. Most of the classiffiers are avaialble at [QIIME2 resources](https://library.qiime2.org/data-resources) page.
+
+
+With [NCBI classifier](https://github.com/anw-sh/ncbi_classifier)
+```bash
+# in q2_raw directory
+(q2_261)$ qiime feature-classifier classify-sklearn --i-classifier ~/ncbi_refseqs_classifier_04032026.qza --i-reads 2_repseqs3.qza --o-classification 3_taxonomy_ncbi.qza --p-n-jobs 10
+(q2_261)$ qiime metadata tabulate --m-input-file 3_taxonomy_ncbi.qza --o-visualization 3_taxonomy_ncbi.qzv
+(q2_261)$ qiime taxa barplot --i-table 2_table3.qza --i-taxonomy 3_taxonomy_ncbi.qza --m-metadata-file ../metadata.tsv --o-visualization 3_taxa_plots_ncbi.qzv
+```
+
+### Phylogeny
+With `mafft` and `iqtree`
+```bash
+# in q2_raw
+(q2_261)$ qiime phylogeny align-to-tree-mafft-iqtree --p-seed 380 --p-alrt 1000 --p-substitution-model 'GTR+G' --p-n-threads 10 --i-sequences 2_repseqs3.qza --o-alignment 4_aligned_repseqs.qza --o-masked-alignment 4_masked_rep_seqs.qza --o-tree 4_unrooted_tree.qza --o-rooted-tree 4_rooted_tree.qza
+```
+
+### Rarefaction curves
+```bash
+# in q2_raw
+(q2_261)$ qiime diversity alpha-rarefaction --i-table 2_table3.qza --i-phylogeny 4_rooted_tree.qza --p-max-depth 45000 --m-metadata-file ../metadata.tsv --o-visualization 5_alpha_rarefaction.qzv
+```
+The minimum feature count should be sufficient for rarefaction (@fig-raw_rarefaction)
+
+```{r}
+#| echo: false
+#| label: fig-raw_rarefaction
+#| fig-cap: Alpha rarefaction curves (raw3)
+#| warning: false
+
+library(tidyverse)
+
+raw3_rar_df <- read.csv("./q2_raw/observed_features.csv")
+
+raw3_rar_df_long <- raw3_rar_df %>% 
+  pivot_longer(
+    cols = starts_with('depth'),
+    names_to = "depth_iter",
+    values_to = "Obs_features"
+  ) %>% 
+  separate_wider_delim(
+    cols = depth_iter,
+    delim = "_",
+    names = c("depth", "iteration")
+  ) %>% 
+  mutate(
+    depth = as.numeric(str_replace(depth, "depth.", "")),
+    iteration = as.numeric(str_replace(iteration, "iter.", ""))
+  ) %>% 
+  drop_na(Obs_features)
+
+raw3_rar_summary <- raw3_rar_df_long %>% 
+  group_by(sample.id, depth, SampleName) %>% 
+  summarise(mean_features = mean(Obs_features), .groups = "drop")
+
+raw3_group_summary <- raw3_rar_summary %>% 
+  group_by(depth, SampleName) %>% 
+  summarise(
+    avg_features = mean(mean_features),
+    sd_features = sd(mean_features),
+    .groups = "drop"
+  )
+
+
+raw3_plot <- ggplot(raw3_group_summary, aes(x = depth, y = avg_features, color = SampleName)) +
+  geom_line(linewidth = 0.75, alpha = 0.75) +
+#   geom_ribbon(
+#     aes(ymin = avg_features - sd_features, ymax = avg_features + sd_features, fill = SampleName),
+#     alpha = 0.2, color = NA
+#   ) +
+  labs(
+    title = "Alpha Rarefaction",
+    subtitle = "Observed Features across sequencing depths",
+    x = "Sequencing Depth",
+    y = "Observed Features",
+    color = "Sample"
+  ) +
+  theme_bw()
+
+raw3_plot
+```
+
+
+> Repeat these 3 steps (classification, phylogeny, and rarefaction curves) in the `q2_filt` directory
+
+:::{.callout-caution icon="false" title="q2_filt" collapse="true"}
+After classification and generation of taxa plots, it was observed that there were only 4 species identified across the samples. q2_filt method is not suitable for analysis.
+:::
+
+## Using HiFi 16S workflow
+The official package for 16S amplicon analysis
+
+### Installation
+
+As on 04 Jul 2026, newest version of nextflow is not working with this workflow. Using an older version (24.10)
+```bash
+$ git clone https://github.com/PacificBiosciences/HiFi-16S-workflow.git
+$ cd HiFi-16S-workflow/
+$ mamba create -n pb_16s
+(pb_16s)$ mamba install -c bioconda nextflow=24.10*
+(pb_16s)$ nextflow run main.nf --download_db
+```
+
+### Run
+```bash
+(pb_16s)$ nextflow run main.nf --input /run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/manifest_pb16s.tsv --metadata /run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/metadata.tsv --outdir /run/media/anwesh/hdd_4tb/Files/Analyses/Microbiome/amplicon/test_pacbio/pb_16s --dada2_cpu 10 --vsearch_cpu 10 --cutadapt_cpu 10 --publish_dir_mode copy
+```
+
+All steps, except the last html report generation, were successful.
+
+> Use `--skip_primer_trim` parameter to skip primer trimming
+
+### Outputs
+The numbers are slightly higher that the above methods (@tbl-stats_pb)
+
+```{r}
+#| echo: false
+#| label: tbl-stats_pb
+#| tbl-cap: Denoising stats (pb_16s)
+stats_pb <- read.csv("./pb_16s/results/stats.tsv", sep = "\t")
+knitr::kable(stats_pb, "html")
+```
+
+Sequence lengths: Visualization was not generated by the pipeline, so, generating one
+```bash
+# in pb_16s directory
+(q2_261)$ qiime feature-table tabulate-seqs --i-data dada2/dada2-ccs_rep_filtered.qza --o-visualization results/dada2_rep_filtered.qzv
+```
+
+```{r}
+#| echo: false
+#| label: tbl-pb_seq
+#| tbl-cap: Sequence lengths
+#| tbl-subcap:
+#|  - "Descriptive Stats"
+#|  - "Percentiles"
+#| layout-ncol: 2
+
+library(knitr)
+seq_lengths_pb <- read.csv("./pb_16s/results/dada2_descriptive_stats.tsv", sep = "\t")
+seq_pctile_pb <- read.csv("./pb_16s/results/dada2_seven_number_summary.tsv", sep = "\t")
+
+kable(seq_lengths_pb, digits = 2)
+kable(seq_pctile_pb)
+```
+
+
+```{r}
+#| echo: false
+#| label: fig-pb_rarefaction
+#| fig-cap: Alpha rarefaction curves (pb_16s)
+#| warning: false
+
+library(tidyverse)
+
+pb_rar_df <- read.csv("./pb_16s/results/observed_features.csv")
+
+pb_rar_df_long <- pb_rar_df %>% 
+  pivot_longer(
+    cols = starts_with('depth'),
+    names_to = "depth_iter",
+    values_to = "Obs_features"
+  ) %>% 
+  separate_wider_delim(
+    cols = depth_iter,
+    delim = "_",
+    names = c("depth", "iteration")
+  ) %>% 
+  mutate(
+    depth = as.numeric(str_replace(depth, "depth.", "")),
+    iteration = as.numeric(str_replace(iteration, "iter.", ""))
+  ) %>% 
+  drop_na(Obs_features)
+
+pb_rar_summary <- pb_rar_df_long %>% 
+  group_by(sample.id, depth, SampleName) %>% 
+  summarise(mean_features = mean(Obs_features), .groups = "drop")
+
+pb_group_summary <- pb_rar_summary %>% 
+  group_by(depth, SampleName) %>% 
+  summarise(
+    avg_features = mean(mean_features),
+    sd_features = sd(mean_features),
+    .groups = "drop"
+  )
+
+pb_plot <- ggplot(pb_group_summary, aes(x = depth, y = avg_features, color = SampleName)) +
+  geom_line(linewidth = 0.75, alpha = 0.75) + 
+  scale_y_continuous(breaks = seq(0, 600, by = 100)) +
+  scale_x_continuous(breaks = seq(0, 60000, by = 10000)) +
+  labs(
+    title = "Alpha Rarefaction",
+    subtitle = "Observed Features across sequencing depths",
+    x = "Sequencing Depth",
+    y = "Observed Features",
+    color = "Sample"
+  ) +
+  theme_bw()
+
+pb_plot
+```
+
+> The HiFi workflow is better over QIIME2 based outputs, with the provided parameters. QIIME2 workflow may need tweaking for a better output.
+
+:::{.alert .alert-success .text-center .small .pb-0}
+--- END ---
+:::

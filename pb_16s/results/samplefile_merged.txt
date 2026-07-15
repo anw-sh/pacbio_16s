@@ -1,0 +1,7 @@
+sample-id	absolute-filepath
+SRR23295635	SRR23295635.trimmed.fastq.gz
+SRR23329748	SRR23329748.trimmed.fastq.gz
+SRR23329747	SRR23329747.trimmed.fastq.gz
+SRR23295634	SRR23295634.trimmed.fastq.gz
+SRR23295636	SRR23295636.trimmed.fastq.gz
+SRR23329749	SRR23329749.trimmed.fastq.gz

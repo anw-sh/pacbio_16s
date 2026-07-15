@@ -1,0 +1,8 @@
+sample-id	input	primer-removed	percentage of input primer-removed	filtered	percentage of input passed filter	denoised	non-chimeric	percentage of input non-chimeric
+#q2:types	numeric	numeric	numeric	numeric	numeric	numeric	numeric	numeric
+SRR23295634	47872	41663	87.03	26723	55.82	20507	18893	39.47
+SRR23295635	35263	31375	88.97	18357	52.06	12067	11443	32.45
+SRR23295636	65015	55324	85.09	38005	58.46	30891	28658	44.08
+SRR23329747	78834	69399	88.03	53949	68.43	51408	49375	62.63
+SRR23329748	20586	17647	85.72	14096	68.47	13835	13835	67.21
+SRR23329749	52602	41119	78.17	32064	60.96	30844	30049	57.13

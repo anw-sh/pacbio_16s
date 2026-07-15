@@ -1,0 +1,7 @@
+sample-id	absolute-filepath
+SRR23329747	$PWD/raw_reads/SRR23329747.fastq.gz
+SRR23329748	$PWD/raw_reads/SRR23329748.fastq.gz
+SRR23329749	$PWD/raw_reads/SRR23329749.fastq.gz
+SRR23295634	$PWD/raw_reads/SRR23295634.fastq.gz
+SRR23295635	$PWD/raw_reads/SRR23295635.fastq.gz
+SRR23295636	$PWD/raw_reads/SRR23295636.fastq.gz
